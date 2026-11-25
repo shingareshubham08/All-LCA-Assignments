@@ -3,118 +3,121 @@
 #include <string.h>
 
 struct RobotRecord {
-    int id;
+    int robot_id;
     float depth;
     float pressure;
-    float temp;
+    float temperature;
     float battery;
     char defect[50];
 };
 
-int isUnsafe(struct RobotRecord r) {
-    if (r.depth > 300.0) return 1;
-    if (r.pressure > 30.0) return 1;
-    if (r.temp < 0.0 || r.temp > 35.0) return 1;
-    if (r.battery < 20.0) return 1;
-    if (strcasecmp(r.defect, "none") != 0) return 1;
-    return 0;
+void addRecord(const char *filename) {
+    FILE *fp = fopen(filename, "ab"); 
+    if (fp == NULL) {
+        printf("Error opening file!\n");
+        return;
+    }
+
+    struct RobotRecord rec;
+    printf("\n--- Enter New Robot Telemetry Data ---\n");
+    printf("Robot ID: ");
+    scanf("%d", &rec.robot_id);
+    printf("Depth (m): ");
+    scanf("%f", &rec.depth);
+    printf("Pressure (MPa): ");
+    scanf("%f", &rec.pressure);
+    printf("Temperature (C): ");
+    scanf("%f", &rec.temperature);
+    printf("Battery (%%): ");
+    scanf("%f", &rec.battery);
+    
+    getchar(); 
+    printf("Structural Defect (enter 'None' if no defects): ");
+    fgets(rec.defect, sizeof(rec.defect), stdin);
+    rec.defect[strcspn(rec.defect, "\n")] = 0;
+
+    fwrite(&rec, sizeof(struct RobotRecord), 1, fp);
+    fclose(fp);
+    printf("Record saved successfully!\n");
+}
+
+void generateReport(const char *filename) {
+    FILE *fp = fopen(filename, "rb"); 
+    if (fp == NULL) {
+        printf("No historical records found.\n");
+        return;
+    }
+
+    struct RobotRecord rec;
+    int total_records = 0;
+    int unsafe_count = 0;
+    int defect_count = 0;
+
+    printf("\n====================================================================\n");
+    printf("                 UNDERWATER ROBOT INSPECTION REPORT                 \n");
+    printf("====================================================================\n");
+    printf("%-6s %-8s %-10s %-8s %-9s %-15s %-8s\n", 
+           "ID", "Depth", "Pressure", "Temp", "Battery", "Defect", "Status");
+    printf("--------------------------------------------------------------------\n");
+
+    while (fread(&rec, sizeof(struct RobotRecord), 1, fp) == 1) {
+        total_records++;
+        int is_unsafe = 0;
+
+        if (rec.depth > 300.0) is_unsafe = 1;
+        if (rec.pressure > 30.0) is_unsafe = 1;
+        if (rec.temperature > 35.0) is_unsafe = 1;
+        if (rec.battery < 20.0) is_unsafe = 1;
+        
+        if (strcasecmp(rec.defect, "None") != 0 && strlen(rec.defect) > 0) {
+            is_unsafe = 1;
+            defect_count++;
+        }
+
+        if (is_unsafe) {
+            unsafe_count++;
+        }
+
+        printf("%-6d %-8.1f %-10.1f %-8.1f %-9.1f %-15s %-8s\n",
+               rec.robot_id, rec.depth, rec.pressure, rec.temperature,
+               rec.battery, rec.defect, is_unsafe ? "UNSAFE" : "SAFE");
+    }
+
+    fclose(fp);
+
+    printf("====================================================================\n");
+    printf("Total Records Analyzed : %d\n", total_records);
+    printf("Safe Records           : %d\n", total_records - unsafe_count);
+    printf("Unsafe Records         : %d\n", unsafe_count);
+    printf("Records with Defects   : %d\n", defect_count);
+    printf("====================================================================\n");
 }
 
 int main() {
-    FILE *fp;
-    struct RobotRecord rec;
+    const char *filename = "robot_data.dat";
     int choice;
 
-    printf("Do you want to enter a new robot record? (1 = Yes, 0 = No): ");
-    scanf("%d", &choice);
+    do {
+        printf("\n1. Add New Robot Record\n");
+        printf("2. Generate Inspection Report\n");
+        printf("3. Exit\n");
+        printf("Enter choice: ");
+        scanf("%d", &choice);
 
-    if (choice == 1) {
-        fp = fopen("robot_records.dat", "ab");
-        if (fp == NULL) {
-            printf("Error opening file!\n");
-            return 1;
+        switch (choice) {
+            case 1:
+                addRecord(filename);
+                break;
+            case 2:
+                generateReport(filename);
+                break;
+            case 3:
+                printf("Exiting...\n");
+                break;
+            default:
+                printf("Invalid choice. Try again.\n");
         }
-
-        printf("Enter Record ID: ");
-        scanf("%d", &rec.id);
-        printf("Enter Depth (m): ");
-        scanf("%f", &rec.depth);
-        printf("Enter Water Pressure (MPa): ");
-        scanf("%f", &rec.pressure);
-        printf("Enter Temperature (°C): ");
-        scanf("%f", &rec.temp);
-        printf("Enter Battery Percentage (%%): ");
-        scanf("%f", &rec.battery);
-        printf("Enter Structural Defect (type 'none' if no defect): ");
-        scanf(" %[^\n]", rec.defect);
-
-        fwrite(&rec, sizeof(struct RobotRecord), 1, fp);
-        fclose(fp);
-        printf("Record saved successfully.\n\n");
-    }
-
-    fp = fopen("robot_records.dat", "rb");
-    if (fp == NULL) {
-        printf("No historical records found.\n");
-        return 0;
-    }
-
-    int totalRecords = 0, unsafeCount = 0;
-    int overDepthCount = 0, highPressureCount = 0, tempIssueCount = 0;
-    int lowBatteryCount = 0, structuralDefectCount = 0;
-
-    printf("================ INSPECTION REPORT ================\n");
-
-    while (fread(&rec, sizeof(struct RobotRecord), 1, fp)) {
-        totalRecords++;
-        int unsafe = isUnsafe(rec);
-
-        printf("\nRecord ID: %d\n", rec.id);
-        printf("  Depth: %.2f m | Pressure: %.2f MPa | Temp: %.2f °C | Battery: %.1f%% | Defect: %s\n",
-               rec.depth, rec.pressure, rec.temp, rec.battery, rec.defect);
-
-        if (unsafe) {
-            unsafeCount++;
-            printf("  Status: UNSAFE -> Reasons: ");
-            if (rec.depth > 300.0) {
-                printf("[Over Depth] ");
-                overDepthCount++;
-            }
-            if (rec.pressure > 30.0) {
-                printf("[High Pressure] ");
-                highPressureCount++;
-            }
-            if (rec.temp < 0.0 || rec.temp > 35.0) {
-                printf("[Unsafe Temp] ");
-                tempIssueCount++;
-            }
-            if (rec.battery < 20.0) {
-                printf("[Low Battery] ");
-                lowBatteryCount++;
-            }
-            if (strcasecmp(rec.defect, "none") != 0) {
-                printf("[Structural Defect: %s] ", rec.defect);
-                structuralDefectCount++;
-            }
-            printf("\n");
-        } else {
-            printf("  Status: SAFE\n");
-        }
-    }
-    fclose(fp);
-
-    printf("\n================ SUMMARY STATISTICS ================\n");
-    printf("Total Records Analyzed : %d\n", totalRecords);
-    printf("Safe Records           : %d\n", totalRecords - unsafeCount);
-    printf("Unsafe Records         : %d\n", unsafeCount);
-    printf("\nBreakdown of Unsafe Conditions:\n");
-    printf("  - Over Depth (> 300m)       : %d\n", overDepthCount);
-    printf("  - High Pressure (> 30MPa)   : %d\n", highPressureCount);
-    printf("  - Temp Out of Range (0-35°C): %d\n", tempIssueCount);
-    printf("  - Low Battery (< 20%%)       : %d\n", lowBatteryCount);
-    printf("  - Structural Defects        : %d\n", structuralDefectCount);
-    printf("====================================================\n");
+    } while (choice != 3);
 
     return 0;
 }
-
