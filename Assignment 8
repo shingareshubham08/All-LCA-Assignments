@@ -1,1 +1,30 @@
+#include<stdio.h>
+#define PI 3.1416
 
+void calculations(float diameter, float *lRot, float *rRot, float *totalDist)
+{
+    float circumference = PI * diameter;
+    float leftDist = (*lRot) * circumference;
+    float rightDist = (*rRot) * circumference;
+    *totalDist = (leftDist + rightDist) / 2.0;
+
+    printf("Wheel circumference: %.3f cm \n", circumference);
+    printf("Left Wheel Distance : %.3f cm \n", leftDist);
+    printf("Right Wheel Distance : %.3f cm \n", rightDist);
+}
+
+int main()
+{
+    float diameter, totalDist, lRot, rRot;
+
+    printf("Enter the wheel diameter(cm): ");
+    scanf("%f", &diameter);
+    printf("Enter the left wheel rotations: ");
+    scanf("%f", &lRot);
+    printf("Enter the right wheel rotations: ");
+    scanf("%f", &rRot);
+
+    calculations(diameter, &lRot, &rRot, &totalDist);
+    printf("Total Distance (Average) : %.3f cm \n", totalDist);
+    return 0;
+}
